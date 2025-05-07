@@ -1,6 +1,9 @@
 import Cocoa
 import SwiftUI
 
+var mainWindow: NSWindow?
+var mainWindowController: SettingsWindowController?
+
 class WindowConfig {
     static let width: CGFloat = 659
     static let height: CGFloat = 400
@@ -134,7 +137,7 @@ struct ShortcutSettingsView: View {
         VStack {
             Text("Shortcut Settings")
         }
-        .frame(minWidth: 400, minHeight: 400)
+        .frame(minWidth: 400, minHeight: 200)
     }
 }
 
@@ -144,7 +147,7 @@ struct AppearanceSettingsView: View {
         VStack {
             Text("Appearance Settings")
         }
-        .frame(minWidth: 400, minHeight: 500)
+        .frame(minWidth: 400, minHeight: 250)
     }
 }
 
@@ -190,23 +193,48 @@ class SplitViewController: NSSplitViewController, SidebarSelectionDelegate {
     }
 }
 
-var mainWindow: NSWindow?
-
 func addPaddingToWindowButtons(leading: CGFloat, top: CGFloat) {
-    DispatchQueue.main.async {
-        mainWindow?.standardWindowButton(.miniaturizeButton)?.frame.origin.y -= top
-        mainWindow?.standardWindowButton(.closeButton)?.frame.origin.y -= top
-        mainWindow?.standardWindowButton(.zoomButton)?.frame.origin.y -= top
+    mainWindow?.standardWindowButton(.miniaturizeButton)?.frame.origin.y -= top
+    mainWindow?.standardWindowButton(.closeButton)?.frame.origin.y -= top
+    mainWindow?.standardWindowButton(.zoomButton)?.frame.origin.y -= top
+    
+    mainWindow?.standardWindowButton(.miniaturizeButton)?.frame.origin.x += leading
+    mainWindow?.standardWindowButton(.closeButton)?.frame.origin.x += leading
+    mainWindow?.standardWindowButton(.zoomButton)?.frame.origin.x += leading
+    
+    let buttonContainer = mainWindow?.standardWindowButton(.closeButton)?.superview
+    
+    for subview in buttonContainer?.subviews ?? [] where subview is NSTextField {
+        subview.frame.origin.y -= top
+    }
+}
+
+class SettingsWindowController: NSWindowController {
+    override init(window: NSWindow?) {
+        super.init(window: window)
         
-        mainWindow?.standardWindowButton(.miniaturizeButton)?.frame.origin.x += leading
-        mainWindow?.standardWindowButton(.closeButton)?.frame.origin.x += leading
-        mainWindow?.standardWindowButton(.zoomButton)?.frame.origin.x += leading
-        
-        let buttonContainer = mainWindow?.standardWindowButton(.closeButton)?.superview
-        
-        for subview in buttonContainer?.subviews ?? [] where subview is NSTextField {
-            subview.frame.origin.y -= top
-        }
+        NotificationCenter.default.addObserver(
+                self,
+           selector: #selector(windowDidResize(_:)),
+           name: NSWindow.didResizeNotification,
+           object: mainWindow
+        )
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    @objc func windowDidResize(_ notification: Notification) {
+        addPaddingToWindowButtons(leading: 12, top: 12)
+    }
+    
+    deinit {
+            NotificationCenter.default.removeObserver(
+                self,
+            name: NSWindow.didResizeNotification,
+            object: self.window
+        )
     }
 }
 
@@ -218,17 +246,11 @@ func createMainWindow() {
     )
     mainWindow?.center()
     mainWindow?.contentViewController = SplitViewController()
+    
     mainWindow?.titlebarAppearsTransparent = true
+    mainWindow?.titleVisibility = .hidden
     
-    mainWindow?.title = "Settings"
-    
-    addPaddingToWindowButtons(leading: 12, top: 12)
-    
-    /// hack to increase draggable titlebar area
-    mainWindow?.addTitlebarAccessoryViewController(NSTitlebarAccessoryViewController())
-    
-    let _ = NSWindowController(window: mainWindow)
-    
+    mainWindowController = SettingsWindowController(window: mainWindow)
     mainWindow?.makeKeyAndOrderFront(nil)
 }
 
